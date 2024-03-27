@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/shaders">
+        <file>shapes.frag</file>
+        <file>shapes.vert</file>
+    </qresource>
+    <qresource prefix="/">
+        <file>argyle1.png</file>
+        <file>OIP.jpg</file>
+    </qresource>
+</RCC>
