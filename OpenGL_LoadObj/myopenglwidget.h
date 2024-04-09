@@ -15,6 +15,26 @@
 
 using MySpaceText = struct MySpaceText;
 using MyOpenGLObject = struct MyOpenGLObject;
+using Camera = struct Camera;
+struct Camera
+{
+QVector3D frontVector;
+QVector3D upVector;
+QVector3D rightVector;
+QVector3D pos;
+
+QMatrix4x4 viewMatrix;
+QMatrix4x4 rotationMatrix;
+QMatrix4x4 translateMatrix;
+
+QQuaternion rotationQuat;
+
+QMatrix4x4 projection;
+float zoom;
+};
+
+
+
 
 struct MySpaceText
 {
@@ -34,6 +54,7 @@ struct MyOpenGLObject
 {
     bool normalVectorFlag;
     bool objNormalFlag;
+    bool initFlag;
 
     unsigned int vao;
     unsigned int vbo;
@@ -71,18 +92,28 @@ public:
     void check(MySpaceText* text);
 
     void initObject( MyOpenGLObject* obj );
+    void reInitObject( MyOpenGLObject* obj );
     double posXFromOpenGLToQt(double posX);
     double posYFromOpenGLToQt(double posY);
+
+    double posXFromQtToOpenGL(double posX);
+    double posYFromQtToOpenGL(double posY);
+
     void initTextByObject(MyOpenGLObject* obj);
     void initSetting();
     void initObjectDictionary();
     void initDirectionObject();
     void initLightObject();
+    void initRayObject();
+
+    void updateRay();
+
     Eigen::Vector3d getNormalVector(MyOpenGLObject*obj,int point1,int point2,int point3);
     void testNormalVector(QVector3D point1,QVector3D point2,QVector3D point3);
 
 
     void test();
+    bool intersectTriangle(const QVector3D & origPos, const QVector3D & rayDir, QVector3D v0, QVector3D v1, QVector3D v2, double * t, double *u, double *v);
 protected:
     void initializeGL()override;
     void resizeGL(int w, int h)override;
@@ -105,6 +136,7 @@ private:
     QOpenGLShaderProgram* m_shaderProgram;
     QOpenGLShaderProgram* m_directionShaderProgram;
     QOpenGLShaderProgram* m_lightShaderProgram;
+    QOpenGLShaderProgram* m_rayShaderProgram;
 
     QMap <int,MySpaceText*> m_textDictionary;
     int m_textIdCount;
@@ -113,6 +145,9 @@ private:
     QMap<QString,MyOpenGLObject*> m_modelDictionary;
 
     MyOpenGLObject* m_nowObject;
+
+
+    Camera m_camera;
 
     QMatrix4x4 m_projection;
     QMatrix4x4 m_view;
@@ -143,8 +178,12 @@ private:
     QVector3D m_rightVector;
 
     bool m_shift;
-    bool m_ctrl;
+    bool m_alt;
     bool m_textShow;
+    bool m_rayFlag;
+
+
+    bool m_testFlag;
 };
 
 #endif // MYOPENGLWIDGET_H
