@@ -16,6 +16,7 @@
 using MySpaceText = struct MySpaceText;
 using MyOpenGLObject = struct MyOpenGLObject;
 using Camera = struct Camera;
+
 struct Camera
 {
 QVector3D frontVector;
@@ -26,15 +27,12 @@ QVector3D pos;
 QMatrix4x4 viewMatrix;
 QMatrix4x4 rotationMatrix;
 QMatrix4x4 translateMatrix;
-
+QMatrix4x4 scaleMatrix;
 QQuaternion rotationQuat;
 
 QMatrix4x4 projection;
 float zoom;
 };
-
-
-
 
 struct MySpaceText
 {
@@ -114,6 +112,10 @@ public:
 
     void test();
     bool intersectTriangle(const QVector3D & origPos, const QVector3D & rayDir, QVector3D v0, QVector3D v1, QVector3D v2, double * t, double *u, double *v);
+    bool checkSelectModel(const QVector3D & origPos, const QVector3D & rayDir,MyOpenGLObject*obj);
+    bool rayTriangleIntersect(
+        const Eigen::Vector3d &orig, const Eigen::Vector3d &dir,
+        const Eigen::Vector3d &v0, const Eigen::Vector3d &v1, const Eigen::Vector3d &v2);
 protected:
     void initializeGL()override;
     void resizeGL(int w, int h)override;
@@ -155,12 +157,12 @@ private:
     QMatrix4x4 m_directionPosView;
     QMatrix4x4 m_sun;
     QVector3D  m_lightPos;
-    QVector3D  m_viewPos;
+    //QVector3D  m_viewPos;
 
-    QQuaternion m_viewRotation;
-    QMatrix4x4 m_viewTranslateMatrix;
-    QMatrix4x4 m_viewRotateMatrix;
-    QMatrix4x4 m_viewScaleMatrix;
+    //QQuaternion m_viewRotation;
+    //QMatrix4x4 m_viewTranslateMatrix;
+    //QMatrix4x4 m_viewRotateMatrix;
+    //QMatrix4x4 m_viewScaleMatrix;
 
     QVector3D m_xColor;
     QVector3D m_yColor;

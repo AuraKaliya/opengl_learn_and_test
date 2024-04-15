@@ -46,25 +46,17 @@ void MyOpenGLWidget::read()
     filter<<"*.obj";
     m_modelDir->setNameFilters(filter);
     m_modelList=m_modelDir->entryList(filter,QDir::Files | QDir::Readable,QDir::Name);
-    //qDebug()<<m_modelList;
     for(auto it:m_modelList)
     {
         MyOpenGLObject* obj=new MyOpenGLObject;
         m_objDictionary.insert(it,obj);
-        //m_modelDictionary.insert("Model",obj);
-        //m_modelList.append("Model");
         obj->name=it;
+        //qDebug()<<it;
         obj->normalVectorFlag=false;
         obj->objNormalFlag=false;
-
         m_posList.clear();
         m_indexList.clear();
-
         QString path=m_modelDir->path()+"/"+it;
-        //qDebug()<<path;
-
-
-
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             qDebug() << "无法打开文件：" << path;
@@ -72,7 +64,6 @@ void MyOpenGLWidget::read()
         }
 
         QTextStream in(&file);
-
         //目前 ： 处理 v vn  f
         while (!in.atEnd())
         {
@@ -383,42 +374,29 @@ void MyOpenGLWidget::initSetting()
     m_yColor=QVector3D(0.0,1.0,0.0);
     m_zColor=QVector3D(0.0,0.0,1.0);
 
-
-
     m_sun.setToIdentity();
 
     //m_projection.setToIdentity();
     //m_projection.ortho(-1,1,-1,1,0,-1);
 
-
-
     m_shift=false;
 
     //光源点
     m_lightPos=QVector3D(0,2,0);
-    m_viewPos=QVector3D(0,0,1);
-
-    m_view.setToIdentity();
-    //m_view.translate(m_viewPos);
-    m_model.setToIdentity();
-    m_viewTranslateMatrix.setToIdentity();
-    m_viewTranslateMatrix.translate(-m_viewPos);
-    m_viewRotateMatrix.setToIdentity();
-    m_viewScaleMatrix.setToIdentity();
-
-
+    //m_viewPos=QVector3D(0,0,1);
 
     m_camera.rightVector=QVector3D(1,0,0);
     m_camera.frontVector=QVector3D(0,0,1);
     m_camera.upVector=QVector3D(0,1,0);
+    m_camera.pos=QVector3D(0,0,1);
 
     m_camera.viewMatrix.setToIdentity();
     m_camera.rotationMatrix.setToIdentity();
     m_camera.translateMatrix.setToIdentity();
-    m_camera.pos=QVector3D(0,0,1);
+    m_camera.translateMatrix.translate(m_camera.pos);
+
+
     //m_camera.zoom=45.0f;
-
-
     //m_camera.projection.setToIdentity();
     //m_camera.projection.perspective(qRadiansToDegrees(m_camera.zoom), float(width()) / float(height()), 0.1f, 100.0f);
 
@@ -507,11 +485,11 @@ void MyOpenGLWidget::updateRay()
     //qDebug()<<"View Rotate    :"<<m_viewRotateMatrix;
    // qDebug()<<"View Translate :"<<m_viewTranslateMatrix;
 
-    QMatrix4x4 tRotateMatrix=m_viewRotateMatrix.transposed();
+    QMatrix4x4 tRotateMatrix=m_camera.rotationMatrix.transposed();
 
     QMatrix4x4 tTranslateMatrix;
     tTranslateMatrix.setToIdentity();
-    tTranslateMatrix.translate(-m_viewTranslateMatrix(0,3),-m_viewTranslateMatrix(1,3),0);
+    tTranslateMatrix.translate(-m_camera.translateMatrix(0,3),-m_camera.translateMatrix(1,3),0);
 
     //qDebug()<<"==========now Matrix=========";
     //qDebug()<<"View Rotate    :"<<tRotateMatrix;
@@ -523,17 +501,27 @@ void MyOpenGLWidget::updateRay()
 
     QMatrix4x4 tView;
     tView.setToIdentity();
-    tView=tRotateMatrix*tView;
-    tView=tTranslateMatrix*tView;
+    //tView=tRotateMatrix*tView;
+    //tView=tTranslateMatrix*tView;
 
     QVector3D res=QVector3D(tView*QVector4D(spacePos));
     //qDebug()<<"Res: "<<res;
     MyOpenGLObject * obj=m_objDictionary.find("Ray").value();
     obj->posList.clear();
-    obj->posList<<-m_camera.pos.x()<<-m_camera.pos.y()<<-m_camera.pos.z()
+    obj->posList<<m_camera.pos.x()<<m_camera.pos.y()<<-m_camera.pos.z()
                <<res.x()<<res.y()<<res.z()
                  ;
     reInitObject(obj);
+    QVector3D origPos(m_camera.pos.x(),m_camera.pos.y(),-m_camera.pos.z());
+    QVector3D rayDir(res.x()-origPos.x(),res.y()-origPos.y(),res.z()-origPos.z());
+    MyOpenGLObject* modelObj=m_objDictionary.find("cube2.obj").value();
+
+
+    bool selectFlag=false;
+    selectFlag=checkSelectModel(origPos,rayDir,modelObj);
+
+    qDebug()<<"select:"<<selectFlag;
+
 
     m_rayFlag=true;
 
@@ -672,6 +660,95 @@ double fInvDet=1.0f/det;
 return true;
 }
 
+bool MyOpenGLWidget::checkSelectModel(const QVector3D &origPos, const QVector3D &rayDir, MyOpenGLObject *obj)
+{
+ qDebug()<<"==================MyOpenGLWidget::checkSelectModel======================";
+    bool res=false;
+    qDebug()<<"origPos:"<<origPos;
+    qDebug()<<"rayDir:"<<rayDir;
+for(int i=0;i<obj->indexList.size();i+=3)
+{
+    int posIndex1=obj->indexList[i]*3;
+    int posIndex2=obj->indexList[i+1]*3;
+    int posIndex3=obj->indexList[i+2]*3;
+    QVector3D p1(obj->posList[posIndex1],obj->posList[posIndex1+1],obj->posList[posIndex1+2]);
+    QVector3D p2(obj->posList[posIndex2],obj->posList[posIndex2+1],obj->posList[posIndex2+2]);
+    QVector3D p3(obj->posList[posIndex3],obj->posList[posIndex3+1],obj->posList[posIndex3+2]);
+    qDebug()<<"Model org Pos:"<<p1<<p2<<p3;
+    obj->model.setToIdentity();
+    obj->model=obj->modelRotateMatrix*      obj->model;
+    obj->model=obj->modelTranslateMatrix*   obj->model;
+
+    p1=QVector3D(obj->model * QVector4D(p1,1.0));
+    p2=QVector3D(obj->model * QVector4D(p2,1.0));
+    p3=QVector3D(obj->model * QVector4D(p3,1.0));
+
+
+
+    QVector3D v0(p2-p1);
+    QVector3D v1(p3-p2);
+    QVector3D v2(p1-p3);
+
+    double t;
+    double u;
+    double v;
+    bool flag=intersectTriangle(origPos,rayDir,p1,p2,p3,&t,&u,&v);
+    qDebug()<<"Model Pos:"<<p1<<p2<<p3;
+    qDebug()<<"Model vector:"<<v0<<v1<<v2;
+    qDebug()<<"flag"<<flag;
+    if(flag)
+    {
+        res=true;
+        qDebug()<<"index:"<<obj->indexList[i]<<obj->indexList[i+1]<<obj->indexList[i+2];
+        break;
+    }
+
+}
+qDebug()<<"==================MyOpenGLWidget::checkSelectModel======================end";
+return res;
+}
+
+bool MyOpenGLWidget::rayTriangleIntersect(const Eigen::Vector3d &orig, const Eigen::Vector3d &dir, const Eigen::Vector3d &v0, const Eigen::Vector3d &v1, const Eigen::Vector3d &v2)
+{
+    // 计算三角形的两个边
+    Eigen::Vector3d edge1 = v1 - v0;
+    Eigen::Vector3d edge2 = v2 - v0;
+
+    // 计算向量P
+    Eigen::Vector3d pvec = dir.cross(edge2);
+
+    // 计算行列式
+    double det = edge1.dot(pvec);
+
+    // 如果行列式接近0，射线与三角形平行
+    if (fabs(det) < 1e-8) return false;
+
+    double invDet = 1 / det;
+
+    // 计算射线和三角形顶点0之间的向量T
+    Eigen::Vector3d tvec = orig - v0;
+
+    // 计算u参数并测试边界
+    double u = tvec.dot(pvec) * invDet;
+    if(u<0||u>1)
+    {
+        return false;
+    }
+
+    // 准备测试v参数
+    Eigen::Vector3d qvec = tvec.cross(edge1);
+
+    // 计算v参数并测试边界
+    double v = dir.dot(qvec) * invDet;
+    if (v < 0 || u + v > 1)
+    {
+        return false;
+    }
+
+    return true;
+
+}
+
 void MyOpenGLWidget::initializeGL()
 {
     initializeOpenGLFunctions();
@@ -763,17 +840,17 @@ void MyOpenGLWidget::paintGL()
     //glFrontFace(GL_CW);
 
 //    //更新view
-    m_view.setToIdentity();
-    //m_view.translate(m_viewPos);
-    m_view=m_viewRotateMatrix*m_view;
-    m_view=m_viewTranslateMatrix*m_view;
-    m_view=m_viewScaleMatrix*m_view;
+//    m_view.setToIdentity();
+//    //m_view.translate(m_viewPos);
+//    m_view=m_viewRotateMatrix*m_view;
+//    m_view=m_viewTranslateMatrix*m_view;
+//    m_view=m_viewScaleMatrix*m_view;
 
     //  更新Camera
     m_camera.viewMatrix.setToIdentity();
     m_camera.viewMatrix=m_camera.rotationMatrix*m_camera.viewMatrix;
     m_camera.viewMatrix=m_camera.translateMatrix*m_camera.viewMatrix;
-    m_camera.viewMatrix=m_viewScaleMatrix*m_camera.viewMatrix;
+    m_camera.viewMatrix=m_camera.scaleMatrix*m_camera.viewMatrix;
 
    // m_camera.projection.setToIdentity();
    // m_camera.projection.perspective(qRadiansToDegrees(m_camera.zoom), float(width()) / float(height()), 0.1f, 100.0f);
@@ -814,8 +891,8 @@ void MyOpenGLWidget::paintGL()
     MyOpenGLObject* lightObj=m_objDictionary.find("LightPoint").value();
     glBindVertexArray(lightObj->vao);
     m_lightShaderProgram->setUniformValue("model",lightObj->model);
-    m_lightShaderProgram->setUniformValue("view",m_view);
-    //m_lightShaderProgram->setUniformValue("view",m_camera.viewMatrix);
+   // m_lightShaderProgram->setUniformValue("view",m_view);
+    m_lightShaderProgram->setUniformValue("view",m_camera.viewMatrix);
     m_lightShaderProgram->setUniformValue("lightPos",m_lightPos);
     m_lightShaderProgram->setUniformValue("ourColor",m_xColor);
     glPointSize( 16.0f );
@@ -851,7 +928,7 @@ void MyOpenGLWidget::paintGL()
         //=====  最好应该是用obj内的model的数据，但会引出一个新需求：obj选中列表进行变换处理。
         m_shaderProgram->setUniformValue("model",modelObj->model);
         //m_shaderProgram->setUniformValue("view",m_view);
-        m_shaderProgram->setUniformValue("scale",m_viewScaleMatrix);
+        //m_shaderProgram->setUniformValue("scale",m_viewScaleMatrix);
         //m_shaderProgram->setUniformValue("viewPos",m_viewPos);
 
 
@@ -899,7 +976,7 @@ void MyOpenGLWidget::paintGL()
                 for(MySpaceText* it:modelObj->textList)
                 {
                     //
-                    QVector3D pos=QVector3D(  m_view*modelObj->model*QVector4D(it->spacePoint.x(),
+                    QVector3D pos=QVector3D(  m_camera.viewMatrix*modelObj->model*QVector4D(it->spacePoint.x(),
                                                                                  it->spacePoint.y(),
                                                                                  it->spacePoint.z(),
                                                                                  1.0                ));
@@ -928,7 +1005,7 @@ void MyOpenGLWidget::paintGL()
         m_rayShaderProgram->bind();
         MyOpenGLObject* rayObj=m_objDictionary.find("Ray").value();
         glBindVertexArray(rayObj->vao);
-        m_rayShaderProgram->setUniformValue("view",m_view);
+        m_rayShaderProgram->setUniformValue("view",m_camera.viewMatrix);
         m_rayShaderProgram->setUniformValue("ourColor",m_yColor);
 
         //glPointSize( 16.0f );
@@ -967,14 +1044,16 @@ void MyOpenGLWidget::keyPressEvent(QKeyEvent *e)
             it->modelRotation=QQuaternion();
             it->model.setToIdentity();
         }
-        m_viewTranslateMatrix.setToIdentity();
-        m_viewTranslateMatrix.translate(-m_viewPos);
-        m_viewRotateMatrix.setToIdentity();
-        m_viewRotation=QQuaternion();
-        m_viewScaleMatrix.setToIdentity();
+//        m_viewTranslateMatrix.setToIdentity();
+//        m_viewTranslateMatrix.translate(-m_viewPos);
+//        m_viewRotateMatrix.setToIdentity();
+//        m_viewRotation=QQuaternion();
+//        m_viewScaleMatrix.setToIdentity();
         m_camera.translateMatrix.setToIdentity();
         m_camera.rotationMatrix.setToIdentity();
         m_camera.rotationQuat=QQuaternion();
+        m_camera.translateMatrix.translate(m_camera.pos);
+        m_camera.scaleMatrix.setToIdentity();
 
         //m_view.setToIdentity();
 
@@ -1020,11 +1099,11 @@ void MyOpenGLWidget::wheelEvent(QWheelEvent *e)
     float scaleFactor = 1.05;
     if(delta>0)
     {
-        m_viewScaleMatrix.scale(scaleFactor);
+         m_camera.scaleMatrix.scale(scaleFactor);
     }
     else if(delta <0)
     {
-        m_viewScaleMatrix.scale(1.0/scaleFactor);
+         m_camera.scaleMatrix.scale(1.0/scaleFactor);
     }
     update();
 }
@@ -1052,7 +1131,7 @@ void MyOpenGLWidget::mouseMoveEvent(QMouseEvent *e)
     {
         if ( e->buttons() & Qt::LeftButton )
         {
-            m_viewTranslateMatrix.translate(transXFactor,-transYFactor,0);
+//            m_viewTranslateMatrix.translate(transXFactor,-transYFactor,0);
 
             m_camera.translateMatrix.translate(transXFactor,-transYFactor,0);
 
@@ -1072,9 +1151,9 @@ void MyOpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 
         if(e->buttons() & Qt::RightButton)
         {
-            m_viewRotation=rotationY*rotationX*m_viewRotation;
-            m_viewRotateMatrix.setToIdentity();
-            m_viewRotateMatrix.rotate(m_viewRotation);
+//            m_viewRotation=rotationY*rotationX*m_viewRotation;
+//            m_viewRotateMatrix.setToIdentity();
+//            m_viewRotateMatrix.rotate(m_viewRotation);
 
             m_camera.rotationQuat=rotationY*rotationX*m_camera.rotationQuat;
             m_camera.rotationMatrix.setToIdentity();
