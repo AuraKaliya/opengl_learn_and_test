@@ -828,15 +828,25 @@ void MyOpenGLWidget::paintGL()
 {
 
     //=================预处理====================
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_POINT_SMOOTH);
     glEnable(GL_POLYGON_MODE);
     //glEnable(GL_CULL_FACE);
 
+    // 设置深度缓存
+    glClearDepth(1.0f);
+
+    // 告诉系统对透视进行修正
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+
     glClearColor(0.2f,0.5f,0.5f,1.0f);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
     glPolygonMode(GL_FRONT,GL_FILL);
+    // 启用阴影平滑
+    glShadeModel(GL_SMOOTH);
+
     //glFrontFace(GL_CW);
 
 //    //更新view
