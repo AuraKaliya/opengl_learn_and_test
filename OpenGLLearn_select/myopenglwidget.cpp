@@ -19,6 +19,7 @@ MyOpenGLWidget::MyOpenGLWidget(QWidget *parent)
 {
     resize(1000,1000);
     m_shaderProgram=new QOpenGLShaderProgram;
+    m_borderProgram=new QOpenGLShaderProgram;
     m_modelDir=new QDir("E:/qtFile/OpenGLLearn/model");
     initSetting();
     initObjData();
@@ -68,6 +69,7 @@ void MyOpenGLWidget::initObject(MyOpenGLObject *obj)
     obj->model.setToIdentity();
     obj->modelRotateMatrix.setToIdentity();
     obj->modelTranslateMatrix.setToIdentity();
+    obj->checkFlag=false;
     //====obj property==========END
 
     //====opengl==========
@@ -212,6 +214,17 @@ void MyOpenGLWidget::initShaderProgram()
         qDebug()<<"ERR:"<<m_shaderProgram->log();
         return;
     }
+    m_borderProgram->addCacheableShaderFromSourceFile(QOpenGLShader::Vertex,QString(   "E:/qtFile/OpenGLLearn/shaderProgram/shapes.vert"));
+    m_borderProgram->addCacheableShaderFromSourceFile(QOpenGLShader::Fragment,QString( "E:/qtFile/OpenGLLearn/shaderProgram/border.frag"));
+    success= m_borderProgram->link();
+    if(!success)
+    {
+        qDebug()<<"ERR:"<<m_borderProgram->log();
+        return;
+    }
+
+
+
 }
 
 void MyOpenGLWidget::initObjData()
@@ -556,20 +569,30 @@ void MyOpenGLWidget::paintGL()
 
     //=================预处理====================
 
-    glEnable(GL_DEPTH_TEST);
+
     glEnable(GL_POINT_SMOOTH);
     glEnable(GL_POLYGON_MODE);
+    glEnable(GL_STENCIL_TEST);
+    glEnable(GL_DEPTH_TEST);
+
+
     //glEnable(GL_CULL_FACE);
 
     // 设置深度缓存
    // glClearDepth(1.0f);
+
+    //glDepthFunc(GL_LESS);
+
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
 
     // 告诉系统对透视进行修正
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
     glClearColor(0.2f,0.5f,0.5f,1.0f);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
+    //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glPolygonMode(GL_FRONT,GL_FILL);
     // 启用阴影平滑
     glShadeModel(GL_SMOOTH);
@@ -601,8 +624,7 @@ void MyOpenGLWidget::paintGL()
 
 
     //没用了
-    m_shaderProgram->setUniformValue("view",m_camera.viewMatrix);
-    m_shaderProgram->setUniformValue("model",modelObj->model);
+    //m_shaderProgram->setUniformValue("view",m_camera.viewMatrix);
 
 
 //    QMatrix4x4 viewMatrix;
@@ -630,6 +652,7 @@ void MyOpenGLWidget::paintGL()
 
     //m_shaderProgram->setUniformValue("mvp",mvpMatrix);
     m_shaderProgram->setUniformValue("mvp",m_project*mvpMatrix);
+    m_shaderProgram->setUniformValue("model",modelObj->model);
 
     m_shaderProgram->setUniformValue("lightPos",m_lightPos);
     //m_shaderProgram->setUniformValue("viewPos",m_camera.pos);
@@ -645,7 +668,8 @@ void MyOpenGLWidget::paintGL()
     m_shaderProgram->setUniformValue("light.specular", 1.0f, 1.0f, 1.0f);
     //uniform  交互数据处理
 
-    //绘制
+    //绘制 物体
+    glStencilMask(0xFF);
     if(modelObj->normalVectorFlag)
     {
         //qDebug()<<"check size:"<<modelObj->indexList.size();
@@ -654,6 +678,33 @@ void MyOpenGLWidget::paintGL()
     else
     {
         glDrawElements(GL_TRIANGLES,modelObj->indexList.size(),GL_UNSIGNED_INT,0);
+    }
+
+
+
+//    //绘制 边框
+    if(modelObj->checkFlag)
+    {
+        glStencilMask(0x00);
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth( 1.5f );
+
+        m_borderProgram->bind();
+        m_borderProgram->setUniformValue("mvp",m_project*mvpMatrix);
+
+        if(modelObj->normalVectorFlag)
+        {
+            //qDebug()<<"check size:"<<modelObj->indexList.size();
+            glDrawArrays(GL_LINES,0,modelObj->indexList.size());
+        }
+        else
+        {
+            glDrawElements(GL_LINES,modelObj->indexList.size(),GL_UNSIGNED_INT,0);
+        }
+
+        glStencilMask(0xFF);
+        glEnable(GL_DEPTH_TEST);
     }
 
     //=================模型渲染部分====================
@@ -822,6 +873,7 @@ void MyOpenGLWidget::mousePressEvent(QMouseEvent *e)
         qDebug()<<"0.5:"<<getIntersectionWithZPlane(origPos,rayDir,0.5);
         bool selectFlag=false;
         selectFlag=checkSelectModel(origPos,rayDir,m_obj);
+        m_obj->checkFlag=selectFlag;
         qDebug()<<"select:"<<selectFlag;
     }
 

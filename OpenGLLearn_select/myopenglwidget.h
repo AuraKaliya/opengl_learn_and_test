@@ -53,6 +53,7 @@ struct MyOpenGLObject
     bool normalVectorFlag;
     bool objNormalFlag;
     bool initFlag;
+    bool checkFlag;
 
     unsigned int vao;
     unsigned int vbo;
@@ -119,6 +120,7 @@ signals:
 private:
     QDir *m_modelDir;
     QOpenGLShaderProgram* m_shaderProgram;
+    QOpenGLShaderProgram* m_borderProgram;
 
     MyOpenGLObject* m_obj;
     Camera m_camera;
